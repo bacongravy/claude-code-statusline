@@ -110,24 +110,23 @@ def format_usage(usage_data: dict) -> str:
         return f"{RED}Usage: N/A{RESET}"
 
     # Extract 5-hour and 7-day limits
-    five_hour = usage_data.get("five_hour", {})
-    daily = usage_data.get("seven_day", {})
+    five_hour_usage = usage_data.get("five_hour", {})
+    weekly_usage = usage_data.get("seven_day", {})
 
-    five_hour_pct = five_hour.get("utilization", 0) or 0
-    daily_pct = daily.get("utilization", 0) or 0
+    five_hour_percentage = five_hour_usage.get("utilization", 0) or 0
+    weekly_percentage = weekly_usage.get("utilization", 0) or 0
 
-    # Color based on usage level
-    def color_pct(pct: float) -> str:
-        if pct >= USAGE_THRESHOLD_HIGH:
-            return RED
-        elif pct >= USAGE_THRESHOLD_MEDIUM:
-            return YELLOW
-        return GREEN
+    five_hour_str = f"{get_usage_color(five_hour_percentage)}{five_hour_percentage:.0f}%{RESET}"
+    weekly_str = f"{get_usage_color(weekly_percentage)}{weekly_percentage:.0f}%{RESET}"
 
-    five_hour_str = f"{color_pct(five_hour_pct)}{five_hour_pct:.0f}%{RESET}"
-    daily_str = f"{color_pct(daily_pct)}{daily_pct:.0f}%{RESET}"
+    return f"5h: {five_hour_str} | 7d: {weekly_str}"
 
-    return f"5h: {five_hour_str} | 7d: {daily_str}"
+def get_usage_color(percentage: float) -> str:
+    if percentage >= USAGE_THRESHOLD_HIGH:
+        return RED
+    elif percentage >= USAGE_THRESHOLD_MEDIUM:
+        return YELLOW
+    return GREEN
 
 if __name__ == "__main__":
     main()
