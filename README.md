@@ -1,15 +1,17 @@
 # Claude Code Status Line
 
-A Python status line script for Claude Code that displays your current model, API usage limits, and working directory.
+A Python status line script for Claude Code that displays your current model, context usage, API usage limits, working directory, and git status.
 
 ## Features
 
+- **Directory & Git Info**: Current directory with git branch and status
+  - Staged, unstaged, and untracked file counts
+  - Commits ahead/behind tracking branch
+  - Supports git worktrees and detached HEAD
 - **Model Display**: Shows the currently active Claude model
-- **Usage Tracking**: Real-time 5-hour and 7-day API usage limits with color-coded alerts
-  - 🟢 Green: < 50% usage
-  - 🟡 Yellow: 50-80% usage
-  - 🔴 Red: > 80% usage
-- **Directory Info**: Displays current working directory
+- **Context Usage**: Visual progress bar showing context window utilization
+- **Usage Tracking**: Real-time 5-hour and 7-day API usage limits with visual progress bars
+  - Color-coded alerts (green < 50%, yellow 50-80%, red > 80%)
 - **OAuth Integration**: Automatically reads credentials from Claude Code
 
 ## Prerequisites
@@ -57,7 +59,8 @@ The script:
 ## Example Output
 
 ```
-Sonnet 4.5 | 5h: 23% | 7d: 45% | Dir: /Users/you/projects/myapp
+📂 ~/projects/myapp · 🌿 main (1 staged, 2 unstaged, 1 ahead)
+🧠 Claude Opus 4.5 · 📝 ██░░░░░░░░ 23% · 🕔 ██░░░░░░░░ 15% · 🗓️ ████░░░░░░ 45%
 ```
 
 ## Troubleshooting

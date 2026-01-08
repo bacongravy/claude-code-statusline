@@ -20,6 +20,8 @@ USAGE_THRESHOLD_HIGH = 80
 USAGE_THRESHOLD_MEDIUM = 50
 CREDENTIALS_PATH = Path.home() / ".claude" / ".credentials.json"
 
+BLOCKS = "▏▎▍▌▋▊▉█"
+
 def main():
     try:
         raw = sys.stdin.read()
@@ -29,8 +31,10 @@ def main():
         return
 
     # Extract fields
-    current_directory = data.get("cwd", "")
+    current_directory = tilde_path(data.get("cwd", ""))
+    project_directory = data.get("workspace", {}).get("project_dir", current_directory)
     model = data.get("model", {}).get("display_name", "")
+    context_window = data.get("context_window", {})
 
     # Fetch usage from API
     access_token = get_access_token()
@@ -41,10 +45,84 @@ def main():
     else:
         usage_str = f"{RED}No credentials{RESET}"
 
-    line = f"{BLUE}{model}{RESET} | {usage_str} | Dir: {current_directory}"
+    line = f"📂 {current_directory}{format_git_branch(project_directory)}\n🧠 {CYAN}{model}{RESET} · {format_context_usage(context_window)} · {usage_str}"
 
     print(line)
 
+def tilde_path(path):
+    path = Path(path).expanduser()
+    home = Path.home()
+
+    try:
+        return "~" / path.relative_to(home)
+    except ValueError:
+        return path
+
+def format_context_usage(context_window):
+    percent_used = 0
+    context_size = context_window.get("context_window_size")
+    usage = context_window.get("current_usage")
+
+    if context_size is not None and usage is not None:
+        current_tokens = (
+            usage.get("input_tokens", 0)
+            + usage.get("cache_creation_input_tokens", 0)
+            + usage.get("cache_read_input_tokens", 0)
+        )
+        percent_used = current_tokens * 100 // context_size
+
+    return f"📝 {get_usage_color(percent_used)}{get_progress_bar(percent_used)} {percent_used}%{RESET}"
+
+def format_git_branch(project_directory):
+    """Get git info from single git status call. Works with regular repos and worktrees."""
+    staged = unstaged = ahead = behind = 0
+    branch = ""
+
+    try:
+        result = subprocess.run(
+            ["git", "status", "--porcelain", "-b"],
+            capture_output=True, text=True, timeout=2, cwd=project_directory
+        )
+        if result.returncode != 0:
+            return ""
+
+        for line in result.stdout.splitlines():
+            if line.startswith('## '):
+                # Parse: ## branch...upstream [ahead N, behind M]
+                # or: ## HEAD (no branch) for detached HEAD
+                branch_part = line[3:]
+                if branch_part.startswith('HEAD (no branch)'):
+                    branch = "detached HEAD"
+                else:
+                    branch = branch_part.split('...')[0].split()[0]
+                    if '[ahead ' in line:
+                        ahead = int(line.split('[ahead ')[1].split(',')[0].split(']')[0])
+                    if '[behind ' in line:
+                        behind = int(line.split('[behind ')[1].split(']')[0])
+            elif len(line) >= 2:
+                if line[0] not in ' ?':  # Index has changes (staged)
+                    staged += 1
+                if line[1] != ' ':  # Worktree has changes or untracked
+                    unstaged += 1
+    except (subprocess.TimeoutExpired, OSError, ValueError):
+        return ""
+
+    if not branch:
+        return ""
+
+    # Build change info string
+    parts = []
+    if staged:
+        parts.append(f"{staged} staged")
+    if unstaged:
+        parts.append(f"{unstaged} unstaged")
+    if ahead:
+        parts.append(f"{ahead} ahead")
+    if behind:
+        parts.append(f"{behind} behind")
+
+    suffix = f" ({', '.join(parts)})" if parts else ""
+    return f" · 🌿 {branch}{suffix}"
 
 def get_access_token() -> str | None:
     """Retrieve the access token based on the platform."""
@@ -56,7 +134,6 @@ def get_access_token() -> str | None:
         return get_access_token_linux()
     else:
         return None # Windows not supported
-
 
 def get_access_token_macos() -> str | None:
     """Retrieve access token from macOS Keychain."""
@@ -76,7 +153,6 @@ def get_access_token_macos() -> str | None:
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired, json.JSONDecodeError, KeyError):
         return None
 
-
 def get_access_token_linux() -> str | None:
     """Read access token from credentials file on Linux."""
     try:
@@ -85,7 +161,6 @@ def get_access_token_linux() -> str | None:
         return creds.get("claudeAiOauth", {}).get("accessToken")
     except (FileNotFoundError, json.JSONDecodeError, KeyError):
         return None
-
 
 def fetch_usage(access_token: str) -> dict | None:
     """Fetch usage data from Anthropic API."""
@@ -103,6 +178,22 @@ def fetch_usage(access_token: str) -> dict | None:
     except (urllib.error.URLError, json.JSONDecodeError, TimeoutError):
         return None
 
+def get_progress_bar(progress, total=100, width=10):
+    percent = progress / total
+    total_blocks = width * 8  # 8 sub-blocks per character
+    filled_blocks = int(percent * total_blocks)
+
+    full_chars = filled_blocks // 8
+    remainder = filled_blocks % 8
+    empty = width - full_chars
+
+    bar = "█" * full_chars
+    if remainder > 0:
+        bar += BLOCKS[remainder - 1]
+        empty -= 1
+    bar += "░" * empty
+
+    return bar
 
 def format_usage(usage_data: dict) -> str:
     """Format usage data for statusline display."""
@@ -116,10 +207,10 @@ def format_usage(usage_data: dict) -> str:
     five_hour_percentage = five_hour_usage.get("utilization", 0) or 0
     weekly_percentage = weekly_usage.get("utilization", 0) or 0
 
-    five_hour_str = f"{get_usage_color(five_hour_percentage)}{five_hour_percentage:.0f}%{RESET}"
-    weekly_str = f"{get_usage_color(weekly_percentage)}{weekly_percentage:.0f}%{RESET}"
+    five_hour_str = f"{get_usage_color(five_hour_percentage)}{get_progress_bar(five_hour_percentage)} {five_hour_percentage:.0f}%{RESET}"
+    weekly_str = f"{get_usage_color(weekly_percentage)}{get_progress_bar(weekly_percentage)} {weekly_percentage:.0f}%{RESET}"
 
-    return f"5h: {five_hour_str} | 7d: {weekly_str}"
+    return f"🕔 {five_hour_str} · 🗓️ {weekly_str}"
 
 def get_usage_color(percentage: float) -> str:
     if percentage >= USAGE_THRESHOLD_HIGH:
