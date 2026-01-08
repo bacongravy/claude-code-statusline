@@ -36,16 +36,14 @@ def main():
     model = data.get("model", {}).get("display_name", "")
     context_window = data.get("context_window", {})
 
-    # Fetch usage from API
+    # Fetch usage from API (if credentials available)
     access_token = get_access_token()
-
+    usage_str = ""
     if access_token:
         usage_data = fetch_usage(access_token)
-        usage_str = format_usage(usage_data)
-    else:
-        usage_str = f"{RED}No credentials{RESET}"
+        usage_str = f" · {format_usage(usage_data)}"
 
-    line = f"📂 {current_directory}{format_git_branch(project_directory)}\n🧠 {CYAN}{model}{RESET} · {format_context_usage(context_window)} · {usage_str}"
+    line = f"📂 {current_directory}{format_git_branch(project_directory)}\n🧠 {CYAN}{model}{RESET} · {format_context_usage(context_window)}{usage_str}"
 
     print(line)
 

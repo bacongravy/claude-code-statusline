@@ -12,13 +12,14 @@ A Python status line script for Claude Code that displays your current model, co
 - **Context Usage**: Visual progress bar showing context window utilization
 - **Usage Tracking**: Real-time 5-hour and 7-day API usage limits with visual progress bars
   - Color-coded alerts (green < 50%, yellow 50-80%, red > 80%)
-- **OAuth Integration**: Automatically reads credentials from Claude Code
+  - Only shown for Pro/Max subscribers with OAuth credentials
 
 ## Prerequisites
 
 - Python 3.10 or higher
-- Claude Code with OAuth authentication configured
+- Claude Code CLI
 - Supported platforms: macOS, Linux (Windows not supported)
+- Optional: OAuth login for Pro/Max quota display
 
 ## Installation
 
@@ -65,8 +66,8 @@ The script:
 
 ## Troubleshooting
 
-- **"No credentials" message**: Ensure you're logged in to Claude Code with OAuth
 - **"Usage: N/A" message**: API request failed (check network connection)
+- **Quota usage not showing**: Requires Pro/Max subscription with OAuth login
 - **Script not updating**: Verify the path in `.claude/settings.json` is absolute and executable
 
 ## Documentation
