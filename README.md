@@ -23,28 +23,26 @@ A Python status line script for Claude Code that displays your current model, co
 
 ## Installation
 
-1. **Clone or download this repository**
+1. **Download or copy `statusline.py` to `~/.claude/statusline.py`**
    ```bash
-   git clone <repository-url>
-   cd claude-code-statusline
+   curl -o ~/.claude/statusline.py https://raw.githubusercontent.com/bacongravy/claude-code-statusline/main/statusline.py
+   chmod +x ~/.claude/statusline.py
    ```
 
 2. **Configure Claude Code**
 
-   Add the following to your `.claude/settings.json`:
+   Add or update the `statusLine` attribute in `~/.claude/settings.json`:
    ```json
    {
      "statusLine": {
        "type": "command",
-       "command": "python3 /path/to/statusline.py",
+       "command": "~/.claude/statusline.py",
        "padding": 0
      }
    }
    ```
 
-   Replace `/path/to/statusline.py` with the absolute path to this script.
-
-4. **Restart Claude Code**
+3. **Restart Claude Code**
 
 ## How It Works
 
