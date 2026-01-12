@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 import sys
 import json
 import urllib.request
@@ -22,6 +23,11 @@ CREDENTIALS_PATH = Path.home() / ".claude" / ".credentials.json"
 
 BLOCKS = "▏▎▍▌▋▊▉█"
 
+# OSC 8 hyperlink escape sequences (for iTerm2, etc.)
+OSC8_PREFIX = "\x1b]8;;"
+OSC8_SEP = "\x07"
+OSC8_SUFFIX = "\x1b]8;;\x07"
+
 def main():
     try:
         raw = sys.stdin.read()
@@ -31,8 +37,9 @@ def main():
         return
 
     # Extract fields
-    current_directory = tilde_path(data.get("cwd", ""))
-    project_directory = data.get("workspace", {}).get("project_dir", current_directory)
+    cwd = data.get("cwd", "")
+    current_directory = vscode_folder_link(cwd)
+    project_directory = data.get("workspace", {}).get("project_dir", cwd)
     model = data.get("model", {}).get("display_name", "")
     context_window = data.get("context_window", {})
 
@@ -47,14 +54,31 @@ def main():
 
     print(line)
 
-def tilde_path(path):
-    path = Path(path).expanduser()
-    home = Path.home()
+def supports_osc8() -> bool:
+    """Check if the terminal supports OSC 8 hyperlinks."""
+    # Known OSC 8 supporting terminals
+    term_program = os.environ.get("TERM_PROGRAM", "")
+    if term_program in ("iTerm.app", "WezTerm", "Hyper", "Alacritty"):
+        return True
+    # Terminal-specific env vars
+    if any(os.environ.get(var) for var in ("ITERM_SESSION_ID", "WEZTERM_PANE", "WT_SESSION", "KITTY_WINDOW_ID")):
+        return True
+    # Kitty
+    if "kitty" in os.environ.get("TERM", ""):
+        return True
+    return False
 
-    try:
-        return "~" / path.relative_to(home)
-    except ValueError:
-        return path
+def hyperlink(url: str, text: str) -> str:
+    """Create an OSC 8 hyperlink (clickable in iTerm2, etc.)."""
+    return f"{OSC8_PREFIX}{url}{OSC8_SEP}{text}{OSC8_SUFFIX}"
+
+def vscode_folder_link(path: str) -> str:
+    """Create a clickable folder name that opens in VSCode."""
+    folder_name = Path(path).name
+    if not supports_osc8():
+        return folder_name
+    vscode_url = f"vscode://file{path}"
+    return hyperlink(vscode_url, folder_name)
 
 def format_context_usage(context_window):
     percent_used = 0

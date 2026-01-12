@@ -4,7 +4,8 @@ A Python status line script for Claude Code that displays your current model, co
 
 ## Features
 
-- **Directory & Git Info**: Current directory with git branch and status
+- **Directory & Git Info**: Current directory name with git branch and status
+  - Clickable folder name opens in VSCode (Cmd-click in supported terminals)
   - Staged, unstaged, and untracked file counts
   - Commits ahead/behind tracking branch
   - Supports git worktrees and detached HEAD
@@ -58,7 +59,7 @@ The script:
 ## Example Output
 
 ```
-📂 ~/projects/myapp · 🌿 main (1 staged, 2 unstaged, 1 ahead)
+📂 myapp · 🌿 main (1 staged, 2 unstaged, 1 ahead)
 🧠 Claude Opus 4.5 · 📝 ██░░░░░░░░ 23% · 🕔 ██░░░░░░░░ 15% · 🗓️ ████░░░░░░ 45%
 ```
 
@@ -67,6 +68,7 @@ The script:
 - **"Usage: N/A" message**: API request failed (check network connection)
 - **Quota usage not showing**: Requires Pro/Max subscription with OAuth login
 - **Script not updating**: Verify the path in `.claude/settings.json` is absolute and executable
+- **Folder name not clickable**: OSC 8 hyperlinks are only supported in certain terminals (iTerm2, WezTerm, Kitty, Alacritty, Hyper, Windows Terminal)
 
 ## Documentation
 
