@@ -81,18 +81,7 @@ def vscode_folder_link(path: str) -> str:
     return hyperlink(vscode_url, folder_name)
 
 def format_context_usage(context_window):
-    percent_used = 0
-    context_size = context_window.get("context_window_size")
-    usage = context_window.get("current_usage")
-
-    if context_size is not None and usage is not None:
-        current_tokens = (
-            usage.get("input_tokens", 0)
-            + usage.get("cache_creation_input_tokens", 0)
-            + usage.get("cache_read_input_tokens", 0)
-        )
-        percent_used = current_tokens * 100 // context_size
-
+    percent_used = context_window.get("used_percentage", 0)
     return f"📝 {get_usage_color(percent_used)}{get_progress_bar(percent_used)} {percent_used}%{RESET}"
 
 def format_git_branch(project_directory):

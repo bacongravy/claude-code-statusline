@@ -18,7 +18,7 @@ A Python status line script for Claude Code that displays your current model, co
 ## Prerequisites
 
 - Python 3.10 or higher
-- Claude Code CLI
+- Claude Code 2.16 or higher
 - Supported platforms: macOS, Linux (Windows not supported)
 - Optional: OAuth login for Pro/Max quota display
 
