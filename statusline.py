@@ -16,6 +16,12 @@ RED = "\033[31m"
 CYAN = "\033[36m"
 RESET = "\033[0m"
 
+# RGB colors for progress bars (true color)
+RGB_GREEN = (0, 170, 0)
+RGB_YELLOW = (170, 170, 0)
+RGB_RED = (170, 0, 0)
+DIM_FACTOR = 0.3  # Background brightness
+
 USAGE_API_URL = "https://api.anthropic.com/api/oauth/usage"
 USAGE_THRESHOLD_HIGH = 80
 USAGE_THRESHOLD_MEDIUM = 50
@@ -82,7 +88,7 @@ def vscode_folder_link(path: str) -> str:
 
 def format_context_usage(context_window):
     percent_used = context_window.get("used_percentage", 0)
-    return f"📝 {get_usage_color(percent_used)}{get_progress_bar(percent_used)} {percent_used}%{RESET}"
+    return get_progress_bar(percent_used, emoji="📝")
 
 def format_git_branch(project_directory):
     """Get git info from single git status call. Works with regular repos and worktrees."""
@@ -189,7 +195,23 @@ def fetch_usage(access_token: str) -> dict | None:
     except (urllib.error.URLError, json.JSONDecodeError, TimeoutError):
         return None
 
-def get_progress_bar(progress, total=100, width=10):
+def rgb_fg(r, g, b):
+    """Set foreground color using true color (24-bit RGB)."""
+    return f"\033[38;2;{r};{g};{b}m"
+
+def rgb_bg(r, g, b):
+    """Set background color using true color (24-bit RGB)."""
+    return f"\033[48;2;{r};{g};{b}m"
+
+def get_usage_color_rgb(percentage: float) -> tuple:
+    """Get RGB color tuple based on usage percentage."""
+    if percentage >= USAGE_THRESHOLD_HIGH:
+        return RGB_RED
+    elif percentage >= USAGE_THRESHOLD_MEDIUM:
+        return RGB_YELLOW
+    return RGB_GREEN
+
+def get_progress_bar(progress, total=100, width=10, emoji=None):
     percent = progress / total
     total_blocks = width * 8  # 8 sub-blocks per character
     filled_blocks = int(percent * total_blocks)
@@ -198,13 +220,30 @@ def get_progress_bar(progress, total=100, width=10):
     remainder = filled_blocks % 8
     empty = width - full_chars
 
-    bar = "█" * full_chars
+    # Get colors based on progress percentage
+    color = get_usage_color_rgb(progress)
+    dim_color = tuple(int(c * DIM_FACTOR) for c in color)
+
+    # Build bar with foreground color and dim background
+    fg = rgb_fg(*color)
+    bg = rgb_bg(*dim_color)
+
+    bar = fg + bg
+    bar += "█" * full_chars
     if remainder > 0:
         bar += BLOCKS[remainder - 1]
         empty -= 1
-    bar += "░" * empty
+    bar += " " * empty
+    bar += RESET + fg
 
-    return bar
+    # Format percentage based on whether it's a whole number
+    if progress == int(progress):
+        pct_str = f"{int(progress)}%"
+    else:
+        pct_str = f"{progress:.0f}%"
+
+    prefix = f"{emoji} " if emoji else ""
+    return f"{prefix}{bar} {pct_str}{RESET}"
 
 def format_usage(usage_data: dict) -> str:
     """Format usage data for statusline display."""
@@ -218,17 +257,10 @@ def format_usage(usage_data: dict) -> str:
     five_hour_percentage = five_hour_usage.get("utilization", 0) or 0
     weekly_percentage = weekly_usage.get("utilization", 0) or 0
 
-    five_hour_str = f"{get_usage_color(five_hour_percentage)}{get_progress_bar(five_hour_percentage)} {five_hour_percentage:.0f}%{RESET}"
-    weekly_str = f"{get_usage_color(weekly_percentage)}{get_progress_bar(weekly_percentage)} {weekly_percentage:.0f}%{RESET}"
+    five_hour_str = get_progress_bar(five_hour_percentage, emoji="🕔")
+    weekly_str = get_progress_bar(weekly_percentage, emoji="📅")
 
-    return f"🕔 {five_hour_str} · 🗓️ {weekly_str}"
-
-def get_usage_color(percentage: float) -> str:
-    if percentage >= USAGE_THRESHOLD_HIGH:
-        return RED
-    elif percentage >= USAGE_THRESHOLD_MEDIUM:
-        return YELLOW
-    return GREEN
+    return f"{five_hour_str} · {weekly_str}"
 
 if __name__ == "__main__":
     main()
