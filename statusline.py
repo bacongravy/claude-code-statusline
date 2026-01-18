@@ -7,6 +7,7 @@ import urllib.error
 import subprocess
 import platform
 from pathlib import Path
+from datetime import datetime, timezone
 
 # ANSI colors
 BLUE = "\033[34m"
@@ -211,7 +212,33 @@ def get_usage_color_rgb(percentage: float) -> tuple:
         return RGB_YELLOW
     return RGB_GREEN
 
-def get_progress_bar(progress, total=100, width=10, emoji=None):
+def format_time_remaining(resets_at: str | None) -> str:
+    """Format the time remaining until reset as a compact string."""
+    if not resets_at:
+        return ""
+    try:
+        # Parse ISO 8601 timestamp
+        reset_time = datetime.fromisoformat(resets_at)
+        now = datetime.now(timezone.utc)
+        remaining = reset_time - now
+
+        if remaining.total_seconds() <= 0:
+            return ""
+
+        total_minutes = int(remaining.total_seconds() // 60)
+        hours = total_minutes // 60
+        minutes = total_minutes % 60
+
+        if hours >= 24:
+            days = hours // 24
+            return f"{days}d"
+        if hours > 0:
+            return f"{hours}h{minutes:02d}m"
+        return f"{minutes}m"
+    except (ValueError, TypeError):
+        return ""
+
+def get_progress_bar(progress, total=100, width=10, emoji=None, reset_time=None):
     percent = progress / total
     total_blocks = width * 8  # 8 sub-blocks per character
     filled_blocks = int(percent * total_blocks)
@@ -242,8 +269,12 @@ def get_progress_bar(progress, total=100, width=10, emoji=None):
     else:
         pct_str = f"{progress:.0f}%"
 
+    # Add reset time if provided
+    time_str = format_time_remaining(reset_time)
+    suffix = f" ({time_str})" if time_str else ""
+
     prefix = f"{emoji} " if emoji else ""
-    return f"{prefix}{bar} {pct_str}{RESET}"
+    return f"{prefix}{bar} {pct_str}{suffix}{RESET}"
 
 def format_usage(usage_data: dict) -> str:
     """Format usage data for statusline display."""
@@ -255,10 +286,12 @@ def format_usage(usage_data: dict) -> str:
     weekly_usage = usage_data.get("seven_day", {})
 
     five_hour_percentage = five_hour_usage.get("utilization", 0) or 0
+    five_hour_resets = five_hour_usage.get("resets_at")
     weekly_percentage = weekly_usage.get("utilization", 0) or 0
+    weekly_resets = weekly_usage.get("resets_at")
 
-    five_hour_str = get_progress_bar(five_hour_percentage, emoji="🕔")
-    weekly_str = get_progress_bar(weekly_percentage, emoji="📅")
+    five_hour_str = get_progress_bar(five_hour_percentage, emoji="🕔", reset_time=five_hour_resets)
+    weekly_str = get_progress_bar(weekly_percentage, emoji="📅", reset_time=weekly_resets)
 
     return f"{five_hour_str} · {weekly_str}"
 
