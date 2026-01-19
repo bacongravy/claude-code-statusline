@@ -73,3 +73,7 @@ The script:
 ## Documentation
 
 For more information about status lines in Claude Code, see the [official documentation](https://code.claude.com/docs/en/statusline).
+
+## Acknowledgments
+
+This project is based on [claude-code-statusline](https://github.com/lbenothman/claude-code-statusline) by Ben Othman Lotfi.
