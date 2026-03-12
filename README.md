@@ -13,6 +13,7 @@ A Python status line script for Claude Code that displays your current model, co
 - **Context Usage**: Visual progress bar showing context window utilization
 - **Usage Tracking**: Real-time 5-hour and 7-day API usage limits with visual progress bars
   - Color-coded alerts (green < 50%, yellow 50-80%, red > 80%)
+  - Cached responses to avoid API rate limits (respects `Retry-After` headers)
   - Only shown for Pro/Max subscribers with OAuth credentials
 
 ## Prerequisites
@@ -53,7 +54,7 @@ The script:
    - **macOS**: From Keychain using `security find-generic-password`
    - **Linux**: From `~/.claude/.credentials.json`
    - **Windows**: Not supported (returns empty)
-3. Fetches current usage data from Anthropic's API
+3. Fetches current usage data from Anthropic's API (cached for 5 minutes to avoid rate limits)
 4. Outputs a formatted status line with ANSI colors
 
 ## Example Output
@@ -65,7 +66,7 @@ The script:
 
 ## Troubleshooting
 
-- **"Usage: N/A" message**: API request failed (check network connection)
+- **"Usage: N/A" message**: API request failed (check network connection). Stale data is shown during transient failures; delete `~/.claude/.statusline-usage-cache.json` to force a fresh fetch
 - **Quota usage not showing**: Requires Pro/Max subscription with OAuth login
 - **Script not updating**: Verify the path in `.claude/settings.json` is absolute and executable
 - **Folder name not clickable**: OSC 8 hyperlinks are only supported in certain terminals (iTerm2, WezTerm, Kitty, Alacritty, Hyper, Windows Terminal)

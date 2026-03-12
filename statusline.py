@@ -7,7 +7,7 @@ import urllib.error
 import subprocess
 import platform
 from pathlib import Path
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 # ANSI colors
 BLUE = "\033[34m"
@@ -27,6 +27,9 @@ USAGE_API_URL = "https://api.anthropic.com/api/oauth/usage"
 USAGE_THRESHOLD_HIGH = 80
 USAGE_THRESHOLD_MEDIUM = 50
 CREDENTIALS_PATH = Path.home() / ".claude" / ".credentials.json"
+CACHE_PATH = Path.home() / ".claude" / ".statusline-usage-cache.json"
+DEFAULT_CACHE_TTL = 300  # seconds
+MAX_CACHE_TTL = 3600  # seconds
 
 BLOCKS = "▏▎▍▌▋▊▉█"
 
@@ -50,11 +53,11 @@ def main():
     model = data.get("model", {}).get("display_name", "")
     context_window = data.get("context_window", {})
 
-    # Fetch usage from API (if credentials available)
+    # Fetch usage from API (with caching to avoid rate limits)
     access_token = get_access_token()
     usage_str = ""
     if access_token:
-        usage_data = fetch_usage(access_token)
+        usage_data = get_usage_data(access_token)
         usage_str = f" · {format_usage(usage_data)}"
 
     line = f"📂 {current_directory}{format_git_branch(project_directory)}\n🧠 {CYAN}{model}{RESET} · {format_context_usage(context_window)}{usage_str}"
@@ -180,8 +183,47 @@ def get_access_token_linux() -> str | None:
     except (FileNotFoundError, json.JSONDecodeError, KeyError):
         return None
 
-def fetch_usage(access_token: str) -> dict | None:
-    """Fetch usage data from Anthropic API."""
+def get_usage_data(access_token: str) -> dict | None:
+    """Fetch usage data, using cache to avoid rate limits."""
+    now = datetime.now(timezone.utc)
+    cache = read_cache()
+    if cache and now < datetime.fromisoformat(cache["refresh_after"]):
+        return cache["data"]
+
+    usage_data, retry_after = fetch_usage_with_retry_info(access_token)
+    stale_data = cache["data"] if cache else None
+    if usage_data is not None:
+        write_cache(usage_data, DEFAULT_CACHE_TTL)
+        return usage_data
+    write_cache(stale_data, retry_after or DEFAULT_CACHE_TTL)
+    return stale_data
+
+def read_cache() -> dict | None:
+    """Read usage cache file, return None on any error."""
+    try:
+        with open(CACHE_PATH) as f:
+            cache = json.load(f)
+        if "refresh_after" in cache and "data" in cache:
+            return cache
+        return None
+    except (FileNotFoundError, json.JSONDecodeError, KeyError):
+        return None
+
+def write_cache(data: dict | None, refresh_after_seconds: int):
+    """Write usage cache with refresh_after = now + refresh_after_seconds."""
+    refresh_after = datetime.now(timezone.utc) + timedelta(seconds=refresh_after_seconds)
+    cache = {
+        "refresh_after": refresh_after.isoformat(),
+        "data": data,
+    }
+    try:
+        with open(CACHE_PATH, "w") as f:
+            json.dump(cache, f)
+    except OSError:
+        pass
+
+def fetch_usage_with_retry_info(access_token: str) -> tuple[dict | None, int | None]:
+    """Fetch usage data from Anthropic API. Returns (data, retry_after_seconds)."""
     try:
         req = urllib.request.Request(
             USAGE_API_URL,
@@ -192,9 +234,17 @@ def fetch_usage(access_token: str) -> dict | None:
             },
         )
         with urllib.request.urlopen(req, timeout=5) as resp:
-            return json.loads(resp.read().decode())
+            return (json.loads(resp.read().decode()), None)
+    except urllib.error.HTTPError as e:
+        if e.code == 429:
+            try:
+                retry_after = max(1, min(int(e.headers.get("retry-after", DEFAULT_CACHE_TTL)), MAX_CACHE_TTL))
+            except (ValueError, TypeError):
+                retry_after = DEFAULT_CACHE_TTL
+            return (None, retry_after)
+        return (None, None)
     except (urllib.error.URLError, json.JSONDecodeError, TimeoutError):
-        return None
+        return (None, None)
 
 def rgb_fg(r, g, b):
     """Set foreground color using true color (24-bit RGB)."""
